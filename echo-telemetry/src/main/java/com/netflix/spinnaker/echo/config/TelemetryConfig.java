@@ -19,8 +19,8 @@ package com.netflix.spinnaker.echo.config;
 import static retrofit.Endpoints.newFixedEndpoint;
 
 import com.netflix.spinnaker.echo.telemetry.TelemetryService;
+import com.netflix.spinnaker.retrofit.RetrofitConfigurationProperties;
 import com.netflix.spinnaker.retrofit.Slf4jRetrofitLogger;
-import groovy.transform.CompileStatic;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -34,7 +34,6 @@ import retrofit.converter.JacksonConverter;
 @Slf4j
 @Configuration
 @ConditionalOnProperty("telemetry.enabled")
-@CompileStatic
 class TelemetryConfig {
 
   @Value("${telemetry.endpoint}")
@@ -47,7 +46,9 @@ class TelemetryConfig {
 
   @Bean
   public TelemetryService telemetryService(
-      Endpoint telemetryEndpoint, Client retrofitClient, RestAdapter.LogLevel retrofitLogLevel) {
+      Endpoint telemetryEndpoint,
+      Client retrofitClient,
+      RetrofitConfigurationProperties retrofitConfigurationProperties) {
     log.info("Telemetry service loaded");
 
     TelemetryService client =
@@ -55,7 +56,7 @@ class TelemetryConfig {
             .setEndpoint(telemetryEndpoint)
             .setConverter(new JacksonConverter())
             .setClient(retrofitClient)
-            .setLogLevel(RestAdapter.LogLevel.FULL)
+            .setLogLevel(retrofitConfigurationProperties.getLogLevel())
             .setLog(new Slf4jRetrofitLogger(TelemetryService.class))
             .build()
             .create(TelemetryService.class);

@@ -19,7 +19,11 @@ package com.netflix.spinnaker.echo.telemetry;
 import com.google.protobuf.util.JsonFormat;
 import com.netflix.spinnaker.echo.events.EchoEventListener;
 import com.netflix.spinnaker.echo.model.Event;
-import com.netflix.spinnaker.echo.proto.*;
+import com.netflix.spinnaker.proto.stats.Application;
+import com.netflix.spinnaker.proto.stats.Execution;
+import com.netflix.spinnaker.proto.stats.SpinnakerInstance;
+import com.netflix.spinnaker.proto.stats.Stage;
+import com.netflix.spinnaker.proto.stats.Status;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -67,8 +71,9 @@ public class TelemetryEventListener implements EchoEventListener {
       SpinnakerInstance.Builder spinnakerInstance =
           SpinnakerInstance.newBuilder().setId(instanceId).setApplication(applicationBuilder);
 
-      EventProto.Builder eventProto =
-          EventProto.newBuilder().setSpinnakerInstance(spinnakerInstance);
+      com.netflix.spinnaker.proto.stats.Event.Builder eventProto =
+          com.netflix.spinnaker.proto.stats.Event.newBuilder()
+              .setSpinnakerInstance(spinnakerInstance);
 
       telemetryService.sendMessage(JsonFormat.printer().print(eventProto));
 

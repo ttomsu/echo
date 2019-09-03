@@ -1,47 +1,30 @@
+plugins {
+  id 'de.undercouch.download' version '4.0.0'
+}
+
 apply plugin: 'java'
 apply plugin: 'com.google.protobuf'
 
+task downloadProtos(type: Download) {
+  src 'https://raw.githubusercontent.com/spinnaker/stats/master/proto/stats/log.proto'
+  dest "$projectDir/src/main/proto/log.proto"
+  overwrite true
+}
+
 dependencies {
-    implementation 'com.google.protobuf:protobuf-java:3.0.0'
-    implementation 'com.google.guava:guava:23.5-jre'
-    api 'com.google.api.grpc:grpc-google-common-protos:1.0.5'
-    implementation 'io.grpc:grpc-all:1.8.0'
+  implementation 'com.google.protobuf:protobuf-java:3.9.1'
 }
 
 protobuf {
     protoc {
-        artifact = 'com.google.protobuf:protoc:3.5.1-1'
+        artifact = 'com.google.protobuf:protoc:3.9.1'
     }
-    plugins {
-        grpc {
-            artifact = "io.grpc:protoc-gen-grpc-java:1.9.0"
-        }
-    }
-
-    generateProtoTasks {
-        ofSourceSet('main').each { task ->
-            task.builtins {
-                java{
-                    outputSubDir = 'java'
-                }
-            }
-            task.plugins {
-                grpc {
-                    outputSubDir = 'java'
-                }
-            }
-            task.descriptorSetOptions.includeImports = true
-        }
-    }
-    generatedFilesBaseDir = "${projectDir}/build-gen/proto"
 }
+
+tasks.getByName("assemble").dependsOn(downloadProtos)
 
 idea {
     module {
-        sourceDirs += file("${projectDir}/build-gen/proto/main/java")
+        generatedSourceDirs += file("${protobuf.generatedFilesBaseDir}/main/java")
     }
-}
-
-clean {
-    delete "${projectDir}/build-gen"
 }
