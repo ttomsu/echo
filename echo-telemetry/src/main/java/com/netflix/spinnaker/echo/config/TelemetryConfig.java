@@ -19,6 +19,8 @@ package com.netflix.spinnaker.echo.config;
 import com.netflix.spinnaker.echo.telemetry.TelemetryService;
 import com.netflix.spinnaker.retrofit.RetrofitConfigurationProperties;
 import com.netflix.spinnaker.retrofit.Slf4jRetrofitLogger;
+import com.squareup.okhttp.OkHttpClient;
+import java.util.concurrent.TimeUnit;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -27,7 +29,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import retrofit.RestAdapter;
-import retrofit.client.Client;
+import retrofit.client.OkClient;
 import retrofit.converter.JacksonConverter;
 
 @Slf4j
@@ -38,7 +40,6 @@ public class TelemetryConfig {
 
   @Bean
   public TelemetryService telemetryService(
-      Client retrofitClient,
       RetrofitConfigurationProperties retrofitConfigurationProperties,
       TelemetryConfigProps configProps) {
     log.info("Telemetry service loaded");
@@ -47,13 +48,20 @@ public class TelemetryConfig {
         new RestAdapter.Builder()
             .setEndpoint(configProps.endpoint)
             .setConverter(new JacksonConverter())
-            .setClient(retrofitClient)
+            .setClient(telemetryOkClient(configProps))
             .setLogLevel(retrofitConfigurationProperties.getLogLevel())
             .setLog(new Slf4jRetrofitLogger(TelemetryService.class))
             .build()
             .create(TelemetryService.class);
 
     return client;
+  }
+
+  private OkClient telemetryOkClient(TelemetryConfigProps configProps) {
+    OkHttpClient httpClient = new OkHttpClient();
+    httpClient.setConnectTimeout(configProps.connectionTimeoutMillis, TimeUnit.MILLISECONDS);
+    httpClient.setReadTimeout(configProps.readTimeoutMillis, TimeUnit.MILLISECONDS);
+    return new OkClient(httpClient);
   }
 
   @Data
@@ -65,5 +73,7 @@ public class TelemetryConfig {
     boolean enabled = false;
     String endpoint = DEFAULT_TELEMETRY_ENDPOINT;
     String instanceId;
+    int connectionTimeoutMillis = 3000;
+    int readTimeoutMillis = 5000;
   }
 }
