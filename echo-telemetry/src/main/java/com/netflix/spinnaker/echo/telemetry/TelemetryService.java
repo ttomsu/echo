@@ -16,7 +16,7 @@
 
 package com.netflix.spinnaker.echo.telemetry;
 
-import com.squareup.okhttp.RequestBody;
+import okhttp3.RequestBody;
 import retrofit.client.Response;
 import retrofit.http.Body;
 import retrofit.http.POST;
