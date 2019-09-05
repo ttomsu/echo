@@ -91,9 +91,7 @@ public class TelemetryEventListener implements EchoEventListener {
               // TODO(ttomsu, louisjimenez): Add MPTv1 and v2 execution type detection.
               execution.getOrDefault("type", "").toString().toUpperCase());
       Status executionStatus =
-        Status.valueOf(
-          execution.getOrDefault("status", "").toString().toUpperCase();
-        )
+          Status.valueOf(execution.getOrDefault("status", "").toString().toUpperCase());
 
       Map trigger = (Map) execution.getOrDefault("trigger", new HashMap());
       Execution.Trigger.Type triggerType =
