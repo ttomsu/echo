@@ -32,10 +32,10 @@ import java.util.*;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.MediaType;
-import okhttp3.RequestBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import retrofit.mime.TypedString;
 
 @Slf4j
 @Component
@@ -124,10 +124,9 @@ public class TelemetryEventListener implements EchoEventListener {
               .setSpinnakerInstance(spinnakerInstance)
               .build();
 
-      // Have to go through a RequestBody object otherwise Retrofit will try to escape the raw JSON
-      // the protobuf printer produces.
-      RequestBody reqBody = RequestBody.create(APPLICATION_JSON, JSON_PRINTER.print(loggedEvent));
-      telemetryService.log(reqBody);
+      String content = JSON_PRINTER.print(loggedEvent);
+      log.debug("~~~CONTENT: {}", content);
+      telemetryService.log(new TypedJsonString(content));
 
       log.debug("Telemetry sent!");
     } catch (Exception e) {
@@ -144,5 +143,16 @@ public class TelemetryEventListener implements EchoEventListener {
 
   private String hash(String clearText) {
     return Hashing.sha256().hashString(clearText, StandardCharsets.UTF_8).toString();
+  }
+
+  private static class TypedJsonString extends TypedString {
+    TypedJsonString(String body) {
+      super(body);
+    }
+
+    @Override
+    public String mimeType() {
+      return "application/json";
+    }
   }
 }

@@ -16,12 +16,12 @@
 
 package com.netflix.spinnaker.echo.telemetry;
 
-import okhttp3.RequestBody;
 import retrofit.client.Response;
 import retrofit.http.Body;
 import retrofit.http.POST;
+import retrofit.mime.TypedInput;
 
 public interface TelemetryService {
   @POST("/log")
-  Response log(@Body RequestBody body);
+  Response log(@Body TypedInput body);
 }
