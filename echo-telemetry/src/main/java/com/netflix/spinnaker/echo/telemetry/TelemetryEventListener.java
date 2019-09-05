@@ -16,87 +16,118 @@
 
 package com.netflix.spinnaker.echo.telemetry;
 
+import com.google.common.collect.ImmutableSet;
+import com.google.common.hash.Hashing;
 import com.google.protobuf.util.JsonFormat;
+import com.netflix.spinnaker.echo.config.TelemetryConfig;
 import com.netflix.spinnaker.echo.events.EchoEventListener;
 import com.netflix.spinnaker.echo.model.Event;
-import com.netflix.spinnaker.proto.stats.Application;
-import com.netflix.spinnaker.proto.stats.Execution;
-import com.netflix.spinnaker.proto.stats.SpinnakerInstance;
-import com.netflix.spinnaker.proto.stats.Stage;
-import com.netflix.spinnaker.proto.stats.Status;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import com.netflix.spinnaker.kork.proto.stats.Application;
+import com.netflix.spinnaker.kork.proto.stats.Execution;
+import com.netflix.spinnaker.kork.proto.stats.SpinnakerInstance;
+import com.netflix.spinnaker.kork.proto.stats.Stage;
+import com.netflix.spinnaker.kork.proto.stats.Status;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+
+
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
 @ConditionalOnProperty("telemetry.enabled")
 public class TelemetryEventListener implements EchoEventListener {
+
+  private static final Set<String> LOGGABLE_DETAIL_TYPES = ImmutableSet.of(
+    "orca:pipeline:complete",
+    "orca:pipeline:failed"
+  );
+
   private final TelemetryService telemetryService;
 
+  private final TelemetryConfig.TelemetryConfigProps telemetryConfigProps;
+
   @Autowired
-  public TelemetryEventListener(TelemetryService telemetryService) {
+  public TelemetryEventListener(TelemetryService telemetryService,
+                                TelemetryConfig.TelemetryConfigProps telemetryConfigProps) {
     this.telemetryService = telemetryService;
+    this.telemetryConfigProps = telemetryConfigProps;
   }
 
-  @Value("${telemetry.instanceId}")
-  String instanceId;
-
+  @SuppressWarnings("unchecked")
   @Override
   public void processEvent(Event event) {
     try {
-      if (event.getDetails() == null
-          || !event.getDetails().getType().equals("orca:pipeline:complete")) {
+      if (event.getDetails() == null || event.getContent() == null) {
+        log.debug("Telemetry not sent: Details or content not found in event");
         return;
       }
 
-      Map execution = (Map) event.content.get("execution");
-      Execution.Builder executionBuilder = getExecutionBuilder(execution);
-
-      List<Map> stages = (ArrayList<Map>) execution.get("stages");
-      for (Map stage : stages) {
-        executionBuilder.addStages(getStageBuilder(stage));
+      String eventType = event.getDetails().getType();
+      if (!LOGGABLE_DETAIL_TYPES.contains(eventType)) {
+        log.debug("Telemetry not sent: type '{}' not whitelisted ", eventType);
       }
 
-      Application.Builder applicationBuilder =
-          Application.newBuilder()
-              .setId(event.details.getApplication())
-              .setExecution(executionBuilder);
+      Map<String, Object> execution = (Map<String, Object>) event.content.get("execution");
+      if (execution == null) {
+        return;
+      }
 
-      SpinnakerInstance.Builder spinnakerInstance =
-          SpinnakerInstance.newBuilder().setId(instanceId).setApplication(applicationBuilder);
+      String executionId = execution.getOrDefault("id", "").toString();
+      Execution.Type executionType = Execution.Type.valueOf(
+        // TODO(ttomsu, louisjimenez): Add MPTv1 and v2 execution type detection.
+        execution.getOrDefault("type", "").toString().toUpperCase()
+      );
 
-      com.netflix.spinnaker.proto.stats.Event.Builder eventProto =
-          com.netflix.spinnaker.proto.stats.Event.newBuilder()
-              .setSpinnakerInstance(spinnakerInstance);
+      Map trigger = (Map) execution.getOrDefault("trigger", new HashMap());
+      Execution.Trigger.Type triggerType = Execution.Trigger.Type.valueOf(
+        trigger.getOrDefault("type", "UNKNOWN").toString().toUpperCase()
+      );
 
-      telemetryService.sendMessage(JsonFormat.printer().print(eventProto));
+      List<Map> stages = (List<Map>) execution.getOrDefault("stages", new ArrayList<>());
+      List<Stage> protoStages = stages.stream().map(this::toStage).collect(Collectors.toList());
 
+      Execution executionProto = Execution.newBuilder()
+        .setId(executionId)
+        .setType(executionType)
+        .setTrigger(Execution.Trigger.newBuilder().setType(triggerType))
+        .addAllStages(protoStages)
+        .build();
+
+      Application application = Application.newBuilder()
+        .setId(hash(event.details.getApplication()))
+        .setExecution(executionProto)
+        .build();
+
+      SpinnakerInstance spinnakerInstance = SpinnakerInstance.newBuilder()
+        .setId(telemetryConfigProps.getInstanceId())
+        .setApplication(application)
+        .build();
+
+      com.netflix.spinnaker.kork.proto.stats.Event loggedEvent =
+        com.netflix.spinnaker.kork.proto.stats.Event.newBuilder()
+          .setSpinnakerInstance(spinnakerInstance)
+          .build();
+
+      telemetryService.sendMessage(JsonFormat.printer().print(loggedEvent));
+      log.debug("Telemetry sent!");
     } catch (Exception e) {
       log.error("Could not send Telemetry event {}", event, e);
     }
   }
 
-  private Execution.Builder getExecutionBuilder(Map execution) {
-    Map trigger = (Map) execution.get("trigger");
-    return Execution.newBuilder()
-        .setId(execution.get("id").toString())
-        .setType(Execution.Type.valueOf(execution.get("type").toString().toUpperCase()))
-        .setTrigger(
-            Execution.Trigger.newBuilder()
-                .setType(
-                    Execution.Trigger.Type.valueOf(trigger.get("type").toString().toUpperCase())))
-        .setStatus(Status.valueOf(execution.get("status").toString().toUpperCase()));
+  private Stage toStage(Map stage) {
+    return Stage.newBuilder()
+      .setType(stage.get("type").toString())
+      .setStatus(Status.valueOf(stage.get("status").toString().toUpperCase()))
+      .build();
   }
 
-  private Stage.Builder getStageBuilder(Map stage) {
-    return Stage.newBuilder()
-        .setType(stage.get("type").toString())
-        .setStatus(Status.valueOf(stage.get("status").toString().toUpperCase()));
+  private String hash(String clearText) {
+    return Hashing.sha256().hashString(clearText, StandardCharsets.UTF_8).toString();
   }
 }
