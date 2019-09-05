@@ -27,6 +27,8 @@ import com.netflix.spinnaker.kork.proto.stats.Execution;
 import com.netflix.spinnaker.kork.proto.stats.SpinnakerInstance;
 import com.netflix.spinnaker.kork.proto.stats.Stage;
 import com.netflix.spinnaker.kork.proto.stats.Status;
+import com.squareup.okhttp.MediaType;
+import com.squareup.okhttp.RequestBody;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -46,6 +48,10 @@ public class TelemetryEventListener implements EchoEventListener {
           "orca:orchestration:failed",
           "orca:pipeline:complete",
           "orca:pipeline:failed");
+
+  private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
+  private static final JsonFormat.Printer JSON_PRINTER =
+      JsonFormat.printer().omittingInsignificantWhitespace();
 
   private final TelemetryService telemetryService;
 
@@ -118,8 +124,12 @@ public class TelemetryEventListener implements EchoEventListener {
               .setSpinnakerInstance(spinnakerInstance)
               .build();
 
-      telemetryService.log(
-          JsonFormat.printer().omittingInsignificantWhitespace().print(loggedEvent));
+      // Have to go through a RequestBody object otherwise Retrofit will try to escape the raw JSON
+      // the protobuf printer
+      // produces.
+      RequestBody reqBody = RequestBody.create(APPLICATION_JSON, JSON_PRINTER.print(loggedEvent));
+      telemetryService.log(reqBody);
+
       log.debug("Telemetry sent!");
     } catch (Exception e) {
       log.warn("Could not send Telemetry event {}", event, e);

@@ -16,11 +16,12 @@
 
 package com.netflix.spinnaker.echo.telemetry;
 
+import com.squareup.okhttp.RequestBody;
 import retrofit.client.Response;
 import retrofit.http.Body;
 import retrofit.http.POST;
 
 public interface TelemetryService {
   @POST("/log")
-  Response log(@Body String body);
+  Response log(@Body RequestBody body);
 }
