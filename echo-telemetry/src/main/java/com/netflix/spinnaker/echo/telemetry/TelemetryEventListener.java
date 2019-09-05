@@ -90,6 +90,10 @@ public class TelemetryEventListener implements EchoEventListener {
           Execution.Type.valueOf(
               // TODO(ttomsu, louisjimenez): Add MPTv1 and v2 execution type detection.
               execution.getOrDefault("type", "").toString().toUpperCase());
+      Status executionStatus =
+        Status.valueOf(
+          execution.getOrDefault("status", "").toString().toUpperCase();
+        )
 
       Map trigger = (Map) execution.getOrDefault("trigger", new HashMap());
       Execution.Trigger.Type triggerType =
@@ -103,6 +107,7 @@ public class TelemetryEventListener implements EchoEventListener {
           Execution.newBuilder()
               .setId(executionId)
               .setType(executionType)
+              .setStatus(executionStatus)
               .setTrigger(Execution.Trigger.newBuilder().setType(triggerType))
               .addAllStages(protoStages)
               .build();
@@ -125,9 +130,7 @@ public class TelemetryEventListener implements EchoEventListener {
               .build();
 
       String content = JSON_PRINTER.print(loggedEvent);
-      log.debug("~~~CONTENT: {}", content);
       telemetryService.log(new TypedJsonString(content));
-
       log.debug("Telemetry sent!");
     } catch (Exception e) {
       log.warn("Could not send Telemetry event {}", event, e);
