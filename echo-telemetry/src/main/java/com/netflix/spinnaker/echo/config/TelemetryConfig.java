@@ -37,9 +37,10 @@ import retrofit.converter.JacksonConverter;
 public class TelemetryConfig {
 
   @Bean
-  public TelemetryService telemetryService(Client retrofitClient,
-                                           RetrofitConfigurationProperties retrofitConfigurationProperties,
-                                           TelemetryConfigProps configProps) {
+  public TelemetryService telemetryService(
+      Client retrofitClient,
+      RetrofitConfigurationProperties retrofitConfigurationProperties,
+      TelemetryConfigProps configProps) {
     log.info("Telemetry service loaded");
 
     TelemetryService client =

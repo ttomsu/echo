@@ -27,33 +27,34 @@ import com.netflix.spinnaker.kork.proto.stats.Execution;
 import com.netflix.spinnaker.kork.proto.stats.SpinnakerInstance;
 import com.netflix.spinnaker.kork.proto.stats.Stage;
 import com.netflix.spinnaker.kork.proto.stats.Status;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-
-
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Component
 @ConditionalOnProperty("telemetry.enabled")
 public class TelemetryEventListener implements EchoEventListener {
 
-  private static final Set<String> LOGGABLE_DETAIL_TYPES = ImmutableSet.of(
-    "orca:pipeline:complete",
-    "orca:pipeline:failed"
-  );
+  private static final Set<String> LOGGABLE_DETAIL_TYPES =
+      ImmutableSet.of(
+          "orca:orchestration:complete",
+          "orca:orchestration:failed",
+          "orca:pipeline:complete",
+          "orca:pipeline:failed");
 
   private final TelemetryService telemetryService;
 
   private final TelemetryConfig.TelemetryConfigProps telemetryConfigProps;
 
   @Autowired
-  public TelemetryEventListener(TelemetryService telemetryService,
-                                TelemetryConfig.TelemetryConfigProps telemetryConfigProps) {
+  public TelemetryEventListener(
+      TelemetryService telemetryService,
+      TelemetryConfig.TelemetryConfigProps telemetryConfigProps) {
     this.telemetryService = telemetryService;
     this.telemetryConfigProps = telemetryConfigProps;
   }
@@ -70,6 +71,7 @@ public class TelemetryEventListener implements EchoEventListener {
       String eventType = event.getDetails().getType();
       if (!LOGGABLE_DETAIL_TYPES.contains(eventType)) {
         log.debug("Telemetry not sent: type '{}' not whitelisted ", eventType);
+        return;
       }
 
       Map<String, Object> execution = (Map<String, Object>) event.content.get("execution");
@@ -78,40 +80,43 @@ public class TelemetryEventListener implements EchoEventListener {
       }
 
       String executionId = execution.getOrDefault("id", "").toString();
-      Execution.Type executionType = Execution.Type.valueOf(
-        // TODO(ttomsu, louisjimenez): Add MPTv1 and v2 execution type detection.
-        execution.getOrDefault("type", "").toString().toUpperCase()
-      );
+      Execution.Type executionType =
+          Execution.Type.valueOf(
+              // TODO(ttomsu, louisjimenez): Add MPTv1 and v2 execution type detection.
+              execution.getOrDefault("type", "").toString().toUpperCase());
 
       Map trigger = (Map) execution.getOrDefault("trigger", new HashMap());
-      Execution.Trigger.Type triggerType = Execution.Trigger.Type.valueOf(
-        trigger.getOrDefault("type", "UNKNOWN").toString().toUpperCase()
-      );
+      Execution.Trigger.Type triggerType =
+          Execution.Trigger.Type.valueOf(
+              trigger.getOrDefault("type", "UNKNOWN").toString().toUpperCase());
 
       List<Map> stages = (List<Map>) execution.getOrDefault("stages", new ArrayList<>());
       List<Stage> protoStages = stages.stream().map(this::toStage).collect(Collectors.toList());
 
-      Execution executionProto = Execution.newBuilder()
-        .setId(executionId)
-        .setType(executionType)
-        .setTrigger(Execution.Trigger.newBuilder().setType(triggerType))
-        .addAllStages(protoStages)
-        .build();
+      Execution executionProto =
+          Execution.newBuilder()
+              .setId(executionId)
+              .setType(executionType)
+              .setTrigger(Execution.Trigger.newBuilder().setType(triggerType))
+              .addAllStages(protoStages)
+              .build();
 
-      Application application = Application.newBuilder()
-        .setId(hash(event.details.getApplication()))
-        .setExecution(executionProto)
-        .build();
+      Application application =
+          Application.newBuilder()
+              .setId(hash(event.details.getApplication()))
+              .setExecution(executionProto)
+              .build();
 
-      SpinnakerInstance spinnakerInstance = SpinnakerInstance.newBuilder()
-        .setId(telemetryConfigProps.getInstanceId())
-        .setApplication(application)
-        .build();
+      SpinnakerInstance spinnakerInstance =
+          SpinnakerInstance.newBuilder()
+              .setId(telemetryConfigProps.getInstanceId())
+              .setApplication(application)
+              .build();
 
       com.netflix.spinnaker.kork.proto.stats.Event loggedEvent =
-        com.netflix.spinnaker.kork.proto.stats.Event.newBuilder()
-          .setSpinnakerInstance(spinnakerInstance)
-          .build();
+          com.netflix.spinnaker.kork.proto.stats.Event.newBuilder()
+              .setSpinnakerInstance(spinnakerInstance)
+              .build();
 
       telemetryService.sendMessage(JsonFormat.printer().print(loggedEvent));
       log.debug("Telemetry sent!");
@@ -122,9 +127,9 @@ public class TelemetryEventListener implements EchoEventListener {
 
   private Stage toStage(Map stage) {
     return Stage.newBuilder()
-      .setType(stage.get("type").toString())
-      .setStatus(Status.valueOf(stage.get("status").toString().toUpperCase()))
-      .build();
+        .setType(stage.get("type").toString())
+        .setStatus(Status.valueOf(stage.get("status").toString().toUpperCase()))
+        .build();
   }
 
   private String hash(String clearText) {
