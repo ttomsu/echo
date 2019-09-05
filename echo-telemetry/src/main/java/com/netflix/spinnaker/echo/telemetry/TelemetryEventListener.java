@@ -31,7 +31,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.MediaType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -49,7 +48,6 @@ public class TelemetryEventListener implements EchoEventListener {
           "orca:pipeline:complete",
           "orca:pipeline:failed");
 
-  private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
   private static final JsonFormat.Printer JSON_PRINTER =
       JsonFormat.printer().omittingInsignificantWhitespace();
 
