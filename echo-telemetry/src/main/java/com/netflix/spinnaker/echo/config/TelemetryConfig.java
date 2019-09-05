@@ -28,6 +28,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import retrofit.RestAdapter;
 import retrofit.client.Client;
+import retrofit.converter.JacksonConverter;
 
 @Slf4j
 @Configuration
@@ -45,7 +46,7 @@ public class TelemetryConfig {
     TelemetryService client =
         new RestAdapter.Builder()
             .setEndpoint(configProps.endpoint)
-            //            .setConverter(new JacksonConverter())
+            .setConverter(new JacksonConverter())
             .setClient(retrofitClient)
             .setLogLevel(retrofitConfigurationProperties.getLogLevel())
             .setLog(new Slf4jRetrofitLogger(TelemetryService.class))
