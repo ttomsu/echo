@@ -21,6 +21,6 @@ import retrofit.http.Body;
 import retrofit.http.POST;
 
 public interface TelemetryService {
-  @POST("/")
-  Response sendMessage(@Body String body);
+  @POST("/log")
+  Response log(@Body String body);
 }
