@@ -118,7 +118,8 @@ public class TelemetryEventListener implements EchoEventListener {
               .setSpinnakerInstance(spinnakerInstance)
               .build();
 
-      telemetryService.log(JsonFormat.printer().print(loggedEvent));
+      telemetryService.log(
+          JsonFormat.printer().omittingInsignificantWhitespace().print(loggedEvent));
       log.debug("Telemetry sent!");
     } catch (Exception e) {
       log.warn("Could not send Telemetry event {}", event, e);
